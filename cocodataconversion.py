@@ -26,60 +26,71 @@ coco dataset 은 아래의 형식을 따라야 한다
 ]
 
 '''
+import os
+import json
 
-import json 
-import os 
+def convert_text_to_coco(json_dir, out_file):
+    anno_id = 0 
+    image_id = 0 
+    images = [] 
+    annotations = []
+    for filename in os.listdir(json_dir): 
+        if filename.endswith('.json'): 
+            with open(os.path.join(json_dir,filename),'r') as f: 
+                data = json.load(f) 
 
-# 아래의 directory 를 본인 상황에 알맞게 바꾸면 됨 
-train_dir = '/traindataset_root'
-val_dir = '/valdataset_root'
-test_dir = '/testdataset_root' 
+            for image in data['images']: 
+                if image['name'].endswith('jpeg'): 
+                    image['name'] = image['name'].replace('jpeg','jpg')
+                elif image['name'].endswith('JPG'): 
+                    image['name'] = image['name'].replace('JPG','jpg')
+                else: 
+                    image['name'] = image['name']
+                    
+                images.append(dict(
+                    id=image_id,
+                    file_name=image['name'],
+                    height=image['height'],
+                    width=image['width']
+                ))
 
-json_dir = val_dir
-
-coco_format = {
-    'images':[],
-    'annotations':[],
-    'categories': [{'id':1, 'name':'object'}]
-}
-anno_id = 0 
-image_id =0 
-# for every json files 
-for filename in os.listdir(json_dir): 
-    if filename.endswith('.json'): 
-        with open(os.path.join(json_dir,filename),'r') as f: 
-            data = json.load(f) 
-        
-        for image in data['images']: 
-            coco_format['images'].append({
-                'file_name':image['name'], 
-                'height': image['height'],
-                'width': image['width'], 
-                'id': image_id 
-            })
-        # annotations 
-        for anno in data['annotations']: 
-            for poly, bbox in zip(anno["polygons"],anno["bbox"]): 
-                text = poly["text"]
-                idx = poly["id"]
-                bbox_values = [bbox["x"],bbox["y"], 
-                               bbox["width"],bbox["height"]]
+            for anno in data['annotations']: 
+                for poly, bbox in zip(anno["polygons"],anno["bbox"]):  
+                    text = poly["text"]
+                    idx = poly["id"]
+                    
+                    bbox_values = [bbox["x"], bbox["y"], bbox["width"], bbox["height"]]
                 
-                area = bbox_values[2] * bbox_values[3] 
-                coco_format['annotations'].append({
-                    'text': text,
-                    'idx': idx,
-                    'area': area, 
-                    'iscrowd': 0,
-                    'id': image_id,
-                    'bbox': bbox_values,
-                    'category_id': 1, 
-                    'anno_id': anno_id
-                })
+                    area = bbox_values[2] * bbox_values[3]
+                    
+                    annotations.append(dict(
+                        image_id=image_id,
+                        id=anno_id,
+                        category_id=0,
+                        bbox=bbox_values,
+                        area=area,
+                        segmentation=[poly],
+                        iscrowd=0
+                    ))                               
+                    anno_id += 1
+            
+            # increment the image id after processing each json file
+            image_id += 1
+    coco_format = dict(
+        images=images,
+        annotations=annotations,
+        categories=[{'id': 0, 'name': 'text'}])
+    
+    with open(out_file,'w') as f: 
+        json.dump(coco_format,f)
 
-                anno_id += 1 
-        image_id += 1 
 
-
-with open('val.json','w') as f: 
-    json.dump(coco_format,f) 
+if __name__ == '__main__':
+    convert_text_to_coco(json_dir='원래 읽어들일 라벨 경로지정',
+                         out_file='파일명')
+                         
+    convert_text_to_coco(json_dir='라벨들 위치',
+                         out_file='파일명')
+                         
+    convert_text_to_coco(json_dir='ㄼ',
+                         out_file='ㅍㅇ')
